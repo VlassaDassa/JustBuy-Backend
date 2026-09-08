@@ -1,3 +1,6 @@
+import requests
+
+from django.conf import settings
 from django.http import JsonResponse
 from django.db.models import F
 from rest_framework import viewsets, status
@@ -792,7 +795,42 @@ class LogoutAPIView(APIView):
                             status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'success': 'Выход успешен'}, status=status.HTTP_200_OK)
-    
+
+
+@api_view(['GET'])
+def geocode_city(request):
+    city = request.query_params.get('city', '').strip()
+
+    if not city:
+        return Response(
+            {'detail': 'city is required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not settings.YANDEX_GEOCODER_API_KEY:
+        return Response(
+            {'detail': 'geocoding is not configured'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    try:
+        response = requests.get(
+            'https://geocode-maps.yandex.ru/1.x/',
+            params={
+                'apikey': settings.YANDEX_GEOCODER_API_KEY,
+                'geocode': city,
+                'format': 'json',
+            },
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return Response(
+            {'detail': 'geocoding provider error'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response(response.json())
 
 
     

@@ -43,6 +43,7 @@ urlpatterns = [
 
     path('api/get_user_comment_exist_point/<int:user_id>/<int:delivery_point_id>/', views.get_user_comment_exist_point, name='get-user-comment-exist-point'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/geocode_city/', views.geocode_city, name='geocode-city'),
 ]
 
 
