@@ -1,5 +1,6 @@
 import requests
-
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.exceptions import TokenError
 from django.conf import settings
 from django.http import JsonResponse
 from django.db.models import F
@@ -780,21 +781,22 @@ class LoginAPIView(APIView):
 
 
 class LogoutAPIView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
-        refresh_token = request.data.get('refresh_token') # С клиента нужно отправить refresh token
+        refresh_token = request.data.get('refresh_token')
 
-        if not refresh_token:
-            return Response({'error': 'Необходим Refresh token'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass
 
-        try:
-            token = RefreshToken(refresh_token)
-            token.blacklist() # Добавить его в чёрный список. (На клиенте в это время, вы удаляете всю информацию о токене из localStorage)
-        except Exception as e:
-            return Response({'error': 'Неверный Refresh token'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({'success': 'Выход успешен'}, status=status.HTTP_200_OK)
+        return Response(
+            {'success': 'Logout successful'},
+            status=status.HTTP_200_OK
+        )
 
 
 @api_view(['GET'])
@@ -815,22 +817,43 @@ def geocode_city(request):
 
     try:
         response = requests.get(
-            'https://geocode-maps.yandex.ru/1.x/',
+            'https://geocode-maps.yandex.ru/v1/',
             params={
                 'apikey': settings.YANDEX_GEOCODER_API_KEY,
                 'geocode': city,
                 'format': 'json',
+                'lang': 'ru_RU',
+                'results': 5,
             },
-            timeout=5,
-        )
-        response.raise_for_status()
-    except requests.RequestException:
-        return Response(
-            {'detail': 'geocoding provider error'},
-            status=status.HTTP_502_BAD_GATEWAY,
+            timeout=10,
         )
 
-    return Response(response.json())
+        if not response.ok:
+            try:
+                provider_data = response.json()
+                provider_message = provider_data.get('message')
+            except ValueError:
+                provider_message = response.text[:200]
+
+            return Response(
+                {
+                    'detail': 'geocoding provider error',
+                    'provider_status': response.status_code,
+                    'provider_message': provider_message,
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return Response(response.json())
+
+    except requests.RequestException as error:
+        return Response(
+            {
+                'detail': 'geocoding provider unavailable',
+                'error': str(error),
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
 
     
