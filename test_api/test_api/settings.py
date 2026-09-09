@@ -2,11 +2,27 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+from dotenv import load_dotenv
+
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR.parent / '.env')
 
-SECRET_KEY = 'django-insecure-&t92v&0cwnnfer)ztcf-reefx)2t)g&uu)^6s1jt03g)5*!@n4'
+def env_list(name, default=''):
+    return [
+        value.strip()
+        for value in os.getenv(name, default).split(',')
+        if value.strip()
+    ]
 
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'false').lower() == 'true'
+
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+
+if not SECRET_KEY:
+    raise RuntimeError('DJANGO_SECRET_KEY is required')
+
 
 
 INSTALLED_APPS = [
@@ -37,8 +53,24 @@ MIDDLEWARE = [
 ]
 
 
-CORS_ORIGIN_ALLOW_ALL = True
-ALLOWED_HOSTS = ['*']
+
+ALLOWED_HOSTS = env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    'localhost,127.0.0.1',
+)
+
+CORS_ALLOWED_ORIGINS = env_list(
+    'DJANGO_CORS_ALLOWED_ORIGINS',
+)
+
+CSRF_TRUSTED_ORIGINS = env_list(
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+)
+
+YANDEX_GEOCODER_API_KEY = os.getenv(
+    'YANDEX_GEOCODER_API_KEY',
+    '',
+)
 
 AUTH_USER_MODEL = 'testApi.CustomUser'
 
@@ -69,7 +101,7 @@ WSGI_APPLICATION = 'test_api.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.getenv('SQLITE_PATH') or BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -115,7 +147,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = os.getenv('DJANGO_MEDIA_ROOT') or BASE_DIR / 'media'
 
 
 REST_FRAMEWORK = {
